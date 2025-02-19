@@ -1,3 +1,4 @@
+// Start of Selection
 import { ethers } from "ethers";
 import Redis from "ioredis";
 import abi from "./factory";
@@ -71,7 +72,7 @@ async function processBlock(blockNumber: number): Promise<void> {
   while (retries < MAX_RETRIES) {
     try {
       console.log(`\n🔍 Processing block ${blockNumber}...`);
-      trackRPCCall("getBlock");
+      // trackRPCCall("getBlock");
       const block = await provider.getBlock(blockNumber, true);
 
       if (!block) {
@@ -84,14 +85,16 @@ async function processBlock(blockNumber: number): Promise<void> {
           `📦 Block ${blockNumber} has ${block.transactions.length} total transactions`
         );
       }
-
-      const relevantTxs = block.transactions.filter(
-        (tx: any) => tx.to?.toLowerCase() === CONTRACT_ADDRESS.toLowerCase()
+      // Fetch full transactions
+      const transactions = await Promise.all(
+        block.transactions.map((txHash: string) => provider.getTransaction(txHash))
       );
 
+      const relevantTxs = transactions.filter(
+        (tx: any) => tx?.to?.toLowerCase() === CONTRACT_ADDRESS.toLowerCase()
+      );
       console.log(
-        `${blockNumber}: ${relevantTxs.length > 0 ? "✅" : "⏭️"} ${
-          relevantTxs.length
+        `${blockNumber}: ${relevantTxs.length > 0 ? "✅" : "⏭️"} ${relevantTxs.length
         } relevant transactions`
       );
 
@@ -102,7 +105,7 @@ async function processBlock(blockNumber: number): Promise<void> {
           chunk.map(async (tx: any) => {
             const txHash = tx.hash;
             try {
-              trackRPCCall("getTransactionReceipt");
+              // trackRPCCall("getTransactionReceipt");
               const receipt = await provider.getTransactionReceipt(txHash);
               if (!receipt) {
                 if (DEBUG)
@@ -117,8 +120,7 @@ async function processBlock(blockNumber: number): Promise<void> {
 
               if (DEBUG) {
                 console.log(
-                  `📜 TX ${txHash.slice(0, 10)}... has ${
-                    contractLogs.length
+                  `📜 TX ${txHash.slice(0, 10)}... has ${contractLogs.length
                   } contract logs`
                 );
               }
@@ -130,8 +132,7 @@ async function processBlock(blockNumber: number): Promise<void> {
 
                   if (parsedLog && TRACKED_EVENTS.includes(parsedLog.name)) {
                     console.log(
-                      `📢 Event: ${
-                        parsedLog.name
+                      `📢 Event: ${parsedLog.name
                       } | Block: ${blockNumber} | TX: ${txHash.slice(0, 10)}...`
                     );
                     console.log("Event data:", parsedLog.args);
@@ -148,6 +149,7 @@ async function processBlock(blockNumber: number): Promise<void> {
       }
 
       await saveLastProcessedBlock(blockNumber);
+      console.log(`✅ Successfully processed block ${blockNumber}.`);
       return;
     } catch (error) {
       retries++;
@@ -170,7 +172,7 @@ async function processBlocks() {
 
   while (true) {
     try {
-      trackRPCCall("getBlockNumber");
+      // trackRPCCall("getBlockNumber");
       const latestBlock = await provider.getBlockNumber();
 
       if (Date.now() - lastStatsTime > 60000) {
@@ -184,8 +186,7 @@ async function processBlocks() {
 
       if (lastProcessedBlock < latestBlock) {
         console.log(
-          `Processing blocks from ${
-            lastProcessedBlock + 1
+          `Processing blocks from ${lastProcessedBlock + 1
           } to ${latestBlock}...`
         );
 
